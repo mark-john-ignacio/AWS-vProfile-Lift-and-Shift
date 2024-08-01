@@ -242,3 +242,26 @@ EOF
   }
   
 }
+
+
+resource "aws_instance" "vprofile-app-01" {
+  ami = "ami-0a0e5d9c7acc336f1"
+  instance_type = "t2.micro"
+  key_name = "vprofile-prod-key"
+
+  vpc_security_group_ids = [aws_security_group.vprofile-app-sg.id]
+
+  user_data = <<-EOF
+#!/bin/bash
+sudo apt update
+sudo apt upgrade -y
+sudo apt install openjdk-11-jdk -y
+sudo apt install tomcat9 tomcat9-admin tomcat9-docs tomcat9-common git -y
+EOF
+
+  tags = {
+    Name = "vprofile-app-01"
+    Project = "vprofile-lift-and-shift"
+  }
+  
+}
