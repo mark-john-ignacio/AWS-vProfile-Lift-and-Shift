@@ -254,6 +254,7 @@ resource "aws_instance" "vprofile-app-01" {
   key_name = "vprofile-prod-key"
 
   vpc_security_group_ids = [aws_security_group.vprofile-app-sg.id]
+  iam_instance_profile = aws_iam_instance_profile.vprofile-s3-instance-profile.name
 
   user_data = <<-EOF
 #!/bin/bash
@@ -261,6 +262,12 @@ sudo apt update
 sudo apt upgrade -y
 sudo apt install openjdk-11-jdk -y
 sudo apt install tomcat9 tomcat9-admin tomcat9-docs tomcat9-common git -y
+sudo install awscli -y
+sudo aws s3 cp s3://vprofile-lift-and-shift-123abc/vprofile-v2.war /tmp/
+sudo systemctl stop tomcat9
+sudo rm -rf /var/lib/tomcat9/webapps/ROOT
+sudo cp /tmp/vprofile-v2.war /var/lib/tomcat9/webapps/ROOT.war
+sudo systemctl start tomcat9
 EOF
 
   tags = {
@@ -305,4 +312,48 @@ resource "aws_route53_record" "rmq01" {
   type = "A"
   ttl = "300"
   records = [aws_instance.vprofile-rmq-01.private_ip]
+}
+
+resource "aws_s3_bucket" "vprofile-s3" {
+  bucket = "vprofile-lift-and-shift-123abc"
+  tags = {
+    Name = "vprofile-lift-and-shift"
+    Project = "vprofile-lift-and-shift"
+  }
+  
+}
+
+resource "aws_s3_object" "vprofile-s3-obj" {
+  bucket = aws_s3_bucket.vprofile-s3.bucket
+  key = "vprofile-v2.war"
+  source = "../../116 EC2 Instance/vprofile-project/target/vprofile-v2.war"
+}
+
+resource "aws_iam_role" "vprofile-s3-role" {
+  name = "vprofile-s3-role"
+  assume_role_policy = <<EOF
+  {
+    "Version": "2012-10-17",
+    "Statement": [
+        {
+            "Effect": "Allow",
+            "Principal": {
+                "Service": "ec2.amazonaws.com"
+            },
+            "Action": "sts:AssumeRole"
+        }
+    ]
+  }
+EOF
+}
+
+resource "aws_iam_role_policy_attachment" "vprofile-s3-full-access" {
+  role = aws_iam_role.vprofile-s3-role.name
+  policy_arn = "arn:aws:iam::aws:policy/AmazonS3FullAccess"
+}
+
+resource "aws_iam_instance_profile" "vprofile-s3-instance-profile" {
+  name = "vprofile-s3-instance-profile"
+  role = aws_iam_role.vprofile-s3-role.name
+  
 }
