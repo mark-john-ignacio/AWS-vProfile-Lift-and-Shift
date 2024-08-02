@@ -2,10 +2,14 @@ data "http" "my_ip" {
   url = "http://checkip.amazonaws.com/"
 }
 
+data "aws_vpc" "default" {
+  id = "vpc-048c313786f7c4c19"
+}
+
 resource "aws_security_group" "vprofile-ELB-SG" {
   name        = "vprofile ELB-SG"
   description = "SecGroup for vprofile prod Load Balancer"
-  vpc_id      = "vpc-048c313786f7c4c19" 
+  vpc_id      = data.aws_vpc.default.id
 
   ingress {
     from_port   = 80
@@ -264,4 +268,41 @@ EOF
     Project = "vprofile-lift-and-shift"
   }
   
+}
+
+resource "aws_route53_zone" "vprofile-hosted-zone" {
+  name = "vprofile.in"
+  vpc {
+    vpc_id = data.aws_vpc.default.id
+    vpc_region = "us-east-1"
+  }
+  comment = "Private hosted zone for vprofile.in"
+  tags = {
+    Name = "vprofile.in"
+    Project = "vprofile-lift-and-shift"
+  }
+}
+
+resource "aws_route53_record" "db01" {
+  zone_id = aws_route53_zone.vprofile-hosted-zone.zone_id
+  name = "db01.vprofile.in"
+  type = "A"
+  ttl = "300"
+  records = [aws_instance.vprofile-db-01.private_ip]
+}
+
+resource "aws_route53_record" "mc01" {
+  zone_id = aws_route53_zone.vprofile-hosted-zone.zone_id
+  name = "mc01.vprofile.in"
+  type = "A"
+  ttl = "300"
+  records = [aws_instance.vprofile-mc-01.private_ip]
+}
+
+resource "aws_route53_record" "rmq01" {
+  zone_id = aws_route53_zone.vprofile-hosted-zone.zone_id
+  name = "rmq01.vprofile.in"
+  type = "A"
+  ttl = "300"
+  records = [aws_instance.vprofile-rmq-01.private_ip]
 }
