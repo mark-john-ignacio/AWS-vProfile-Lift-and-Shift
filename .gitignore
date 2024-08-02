@@ -17,6 +17,7 @@ infra/*.tfvars.json
 
 # Ignore Terraform plan files
 infra/*.tfplan
+infra/tfplan
 
 # Ignore .terraform directory
 infra/.terraform/
