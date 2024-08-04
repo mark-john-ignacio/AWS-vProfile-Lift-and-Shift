@@ -374,6 +374,11 @@ resource "aws_lb_target_group" "vprofile-app-tg" {
     unhealthy_threshold = 2
   }
 
+  stickiness {
+    type = "lb_cookie"
+    cookie_duration = 86400
+  }
+
   tags = {
     Name = "vprofile-app-tg"
     Project = "vprofile-lift-and-shift"
@@ -483,5 +488,50 @@ resource "aws_launch_template" "vprofile-app-LC" {
     name = aws_iam_instance_profile.vprofile-s3-instance-profile.name
   }
 
+  
+}
+
+resource "aws_autoscaling_group" "vprofile-app-ASG" {
+  name = "vprofile-app-ASG"
+  max_size = 4
+  min_size = 1
+  desired_capacity = 1
+  vpc_zone_identifier = data.aws_subnets.all.ids
+  health_check_type = "ELB"
+  target_group_arns = [aws_lb_target_group.vprofile-app-tg.arn]
+  launch_template {
+    id = aws_launch_template.vprofile-app-LC.id
+    version = "$Latest"
+  }
+
+  tag {
+    key = "Name"
+    value = "vprofile-app-ASG"
+    propagate_at_launch = true
+  }
+
+  tag {
+    key = "Project"
+    value = "vprofile-lift-and-shift"
+    propagate_at_launch = true
+  }
+
+  lifecycle {
+    create_before_destroy = true
+  }
+}
+
+resource "aws_autoscaling_policy" "vprofile-app-ASG-policy" {
+  name = "vprofile-app-ASG-policy"
+  adjustment_type = "ChangeInCapacity"
+  autoscaling_group_name = aws_autoscaling_group.vprofile-app-ASG.name
+  policy_type = "TargetTrackingScaling"
+
+  target_tracking_configuration {
+    predefined_metric_specification {
+      predefined_metric_type = "ASGAverageCPUUtilization"
+    }
+    target_value = 50.0
+  }
   
 }
