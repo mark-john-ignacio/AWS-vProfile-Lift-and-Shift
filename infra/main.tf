@@ -4,6 +4,7 @@ data "http" "my_ip" {
 
 data "aws_vpc" "default" {
   id = "vpc-048c313786f7c4c19"
+  default = true
 }
 
 resource "aws_security_group" "vprofile-ELB-SG" {
@@ -41,7 +42,7 @@ resource "aws_security_group" "vprofile-ELB-SG" {
 resource "aws_security_group" "vprofile-app-sg" {
     name        = "vprofile-app-sg"
     description = "SecGroup for tomcat instances"
-    vpc_id      = "vpc-048c313786f7c4c19" 
+    vpc_id      = data.aws_vpc.default.id
 
     ingress {
         from_port = 8080
@@ -83,7 +84,7 @@ resource "aws_security_group" "vprofile-app-sg" {
 resource "aws_security_group" "vprofile-backend-sg" {
     name        = "vprofile-backend-sg"
     description = "SecGroup for vprofile backend instances"
-    vpc_id      = "vpc-048c313786f7c4c19" 
+    vpc_id      = data.aws_vpc.default.id
 
     ingress {
         from_port = 3306
@@ -356,5 +357,131 @@ resource "aws_iam_role_policy_attachment" "vprofile-s3-full-access" {
 resource "aws_iam_instance_profile" "vprofile-s3-instance-profile" {
   name = "vprofile-s3-instance-profile"
   role = aws_iam_role.vprofile-s3-role.name
+  
+}
+
+resource "aws_lb_target_group" "vprofile-app-tg" {
+  name = "vprofile-app-tg"
+  port = 8080
+  protocol = "HTTP"
+  vpc_id = data.aws_vpc.default.id
+
+  health_check { 
+    path = "/login"
+    port = 8080
+    protocol = "HTTP"
+    healthy_threshold = 2
+    unhealthy_threshold = 2
+  }
+
+  tags = {
+    Name = "vprofile-app-tg"
+    Project = "vprofile-lift-and-shift"
+  }
+  
+}
+
+resource "aws_lb_target_group_attachment" "vprofile-app-tg-attachment" {
+  target_group_arn = aws_lb_target_group.vprofile-app-tg.arn
+  target_id = aws_instance.vprofile-app-01.id
+  port = 8080
+  
+}
+
+resource "aws_lb" "vprofile-prod-elb" {
+  name = "vprofile-prod-elb"
+  internal = false
+  load_balancer_type = "application"
+  security_groups = [aws_security_group.vprofile-ELB-SG.id]
+  subnets = data.aws_subnets.all.ids
+
+  enable_deletion_protection = false
+
+  tags = {
+    Name = "vprofile-prod-elb"
+    Project = "vprofile-lift-and-shift"
+  }
+}
+
+resource "aws_lb_listener" "http" {
+  load_balancer_arn = aws_lb.vprofile-prod-elb.arn
+  port = "80"
+  protocol = "HTTP"
+
+  default_action {
+    type = "forward"
+    target_group_arn = aws_lb_target_group.vprofile-app-tg.arn
+  }
+}
+
+resource "aws_lb_listener" "https" {
+  load_balancer_arn = aws_lb.vprofile-prod-elb.arn
+  port = "443"
+  protocol = "HTTPS"
+  ssl_policy = "ELBSecurityPolicy-2016-08"
+  certificate_arn = "arn:aws:acm:us-east-1:010526260632:certificate/0e73b116-7f6b-4f4b-95d7-ee512bd84279"
+
+  default_action {
+    type = "forward"
+    target_group_arn = aws_lb_target_group.vprofile-app-tg.arn
+  }
+}
+
+data "aws_subnets" "all" {
+  filter {
+    name   = "vpc-id"
+    values = [data.aws_vpc.default.id]
+  }
+}
+
+resource "aws_ami_from_instance" "vprofile-app-image" {
+  name = "vprofile-app-image"
+  source_instance_id = aws_instance.vprofile-app-01.id
+  description = "AMI of vprofile-app-01 instance"
+  tags = {
+    Name = "vprofile-app-image"
+    Project = "vprofile-lift-and-shift"
+  }
+  
+}
+
+resource "aws_launch_template" "vprofile-app-LC" {
+  name = "vprofile-app-LC"
+  image_id = aws_ami_from_instance.vprofile-app-image.id
+  instance_type = "t2.micro"
+  key_name = "vprofile-prod-key"
+
+  network_interfaces {
+    security_groups = [ aws_security_group.vprofile-app-sg.id ]
+  }
+
+  tag_specifications {
+    resource_type = "instance"
+    tags = {
+      Name = "vprofile-app-LC"
+      Project = "vprofile-lift-and-shift"
+    }
+  }
+
+  tag_specifications{
+    resource_type = "volume"
+    tags = {
+      Name = "vprofile-app-LC"
+      Project = "vprofile-lift-and-shift"
+    }
+  }
+
+  tag_specifications {
+    resource_type = "network-interface"
+    tags = {
+      Name = "vprofile-app-LC"
+      Project = "vprofile-lift-and-shift"
+    }
+  }
+
+  iam_instance_profile {
+    name = aws_iam_instance_profile.vprofile-s3-instance-profile.name
+  }
+
   
 }
