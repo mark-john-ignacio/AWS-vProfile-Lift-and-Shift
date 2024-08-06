@@ -2,6 +2,11 @@
 
 This project is a Terraform configuration for deploying a multi-tier application on AWS. The application consists of a frontend, application servers, and backend services including a database, Memcached, and RabbitMQ.
 
+
+## Diagram
+
+![Architecture Diagram](diagram/architecture-diagram.png)
+
 ## Architecture
 
 The architecture consists of the following components:
@@ -61,8 +66,4 @@ To destroy the infrastructure created by this Terraform configuration, run:
 ```sh
 terraform destroy
 ```
-
-## Diagram
-
-![Architecture Diagram](architecture-diagram.png)
 
