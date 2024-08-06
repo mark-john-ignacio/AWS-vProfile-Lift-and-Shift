@@ -1,5 +1,3 @@
-### Updated README.md
-
 # vProfile Lift and Shift Project
 
 This project is a Terraform configuration for deploying a multi-tier application on AWS. The application consists of a frontend, application servers, and backend services including a database, Memcached, and RabbitMQ.
@@ -41,7 +39,7 @@ The architecture consists of the following components:
 
 1. Clone the repository:
    ```sh
-   git clone https://github.com/yourusername/vprofile-lift-and-shift.git
+   git clone https://github.com/mark-john-ignacio/vprofile-lift-and-shift.git
    cd vprofile-lift-and-shift
    ```
 
